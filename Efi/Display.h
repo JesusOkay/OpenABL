@@ -22,6 +22,9 @@ typedef struct _DISPLAY {
   UINTN                         W, H;
 } DISPLAY;
 
+// How many graphics outputs the last DisplayOpen found (1 = the panel only).
+extern UINTN gDisplayGopCount;
+
 // Opens the first graphics output in its current mode. On handhelds that is
 // the panel's native resolution, and changing it isn't supported.
 EFI_STATUS

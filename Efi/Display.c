@@ -9,6 +9,7 @@
 
 #include "Efi/Display.h"
 
+#include "Efi/DpHw.h"
 #include "Efi/Handover.h"
 
 // GET_PROTOCOL leaves the console driver bound to the GOP. We only call Blt
@@ -36,6 +37,13 @@ Opened (IN EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop)
                    Gop->Mode->Info->VerticalResolution};
 }
 
+// Every other graphics output XBL registers (an external display, if XBL
+// brings one up) gets the same frames as the first, so the menu shows on it.
+#define DISPLAY_MIRRORS 4
+STATIC EFI_GRAPHICS_OUTPUT_PROTOCOL *mMirror[DISPLAY_MIRRORS];
+STATIC UINTN                         mMirrorCount;
+UINTN                                gDisplayGopCount;
+
 EFI_STATUS
 DisplayOpen (OUT DISPLAY *Out)
 {
@@ -51,7 +59,17 @@ DisplayOpen (OUT DISPLAY *Out)
   if (Status != EFI_SUCCESS) {
     return Status;
   }
-  Handle = Count ? Handles[0] : NULL;
+  Handle           = Count ? Handles[0] : NULL;
+  gDisplayGopCount = Count;
+  mMirrorCount     = 0;
+  for (UINTN Index = 1; Index < Count && mMirrorCount < DISPLAY_MIRRORS; Index++) {
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *Extra;
+
+    if (OpenGop (Handles[Index], &Extra) == EFI_SUCCESS && Extra->Mode &&
+        Extra->Mode->Info) {
+      mMirror[mMirrorCount++] = Extra;
+    }
+  }
   if (Handles) {
     gBS->FreePool (Handles);
   }
@@ -135,4 +153,20 @@ DisplayBlit (
     Display->Gop, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL *)Pixels, EfiBltBufferToVideo,
     0, 0, X, Y, W, H, (UINTN)Stride * sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL)
   );
+  DpHwMirror (Pixels, Stride, X, Y, W, H);
+  for (UINTN Index = 0; Index < mMirrorCount; Index++) {
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop = mMirror[Index];
+    UINT32                        MW  = Gop->Mode->Info->HorizontalResolution;
+    UINT32                        MH  = Gop->Mode->Info->VerticalResolution;
+
+    // Another size than the panel: draw the part that fits.
+    if (X >= MW || Y >= MH) {
+      continue;
+    }
+    Gop->Blt (
+      Gop, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL *)Pixels, EfiBltBufferToVideo,
+      0, 0, X, Y, MIN (W, MW - X), MIN (H, MH - Y),
+      (UINTN)Stride * sizeof (EFI_GRAPHICS_OUTPUT_BLT_PIXEL)
+    );
+  }
 }

@@ -19,6 +19,8 @@
 #include "Efi/Efi.h"
 #include "Efi/DefaultFiles.h"
 #include "Efi/Display.h"
+#include "Efi/DpHw.h"
+#include "Efi/DpProbe.h"
 #include "Efi/Input.h"
 #include "Efi/Models.h"
 #include "Efi/Qcom.h"
@@ -1140,6 +1142,9 @@ RunMenu (
     MenuHostLog (&M.Host, "openabl-menu: no graphics output");
     return (MENU_END){MENU_END_FAILED, Status};
   }
+  MenuLog ("openabl-menu: %u graphics output(s)", (UINT32)gDisplayGopCount);
+  // USB-C DisplayPort bring-up, phase 1: read-only report to misc.
+  DpProbeRun ();
   DisplaySize (&mDisplay, &PanelW, &PanelH);
   Panel = (PANEL){.W       = (UINT32)PanelW,
                   .H       = (UINT32)PanelH,
@@ -1256,6 +1261,12 @@ RunMenu (
     }
     // Give idle time to fastboot. The ABL serves one USB event per poll,
     // and a download needs polls back to back.
+    // The USB-C port carries the monitor then: fastboot's poll never
+    // returns on it, so there is no fastboot while DP is up.
+    if (gDpScanout) {
+      gBS->Stall (8 * 1000);
+      continue;
+    }
     Until = ClockNowMs () + 8;
     for (;;) {
       Status = MenuHostPoll (&M.Host);

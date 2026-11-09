@@ -10,6 +10,7 @@
   patches XBL's drivers and stays loaded, FLAG_MAIN runs the whole boot.
 */
 
+#include "Efi/DpProbe.h"
 #include "Menu/Menu.h"
 
 #include "Base/Memory.h"
@@ -837,6 +838,10 @@ RunBoot (
 
   if (ModelListRequested (State)) {
     return ModelListAfterRestart (Host);
+  }
+  if (DpProbeWanted ()) {
+    MenuLog ("dp probe run asked for");
+    return FastbootPath (Host, MENU_START_RESULT_NONE);
   }
   if (State->Entry & OPENABL_MENU_ENTRY_FASTBOOT) {
     MenuLog ("fastboot was asked for");
