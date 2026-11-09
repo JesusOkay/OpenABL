@@ -132,6 +132,9 @@ typedef struct _SETTINGS {
 #define SETTINGS_FLAG_BOOT_ENTRY_ONCE "BootEntryOnce"
 // Start was picked in the menu: the next boot goes on without the menu.
 #define SETTINGS_FLAG_SKIP_MENU_ONCE "SkipMenuOnce"
+// Set while the gamepad MCU is brought up; still set means it hung, and
+// it is not tried again (delete the flag to retry).
+#define SETTINGS_FLAG_MCU_TRYING "McuTrying"
 
 // Rules
 

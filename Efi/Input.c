@@ -10,6 +10,7 @@
 #include "Efi/Input.h"
 
 #include "Efi/Efi.h"
+#include "Efi/McuKeys.h"
 
 // Reads the next key the UI uses, skipping others. Returns FALSE when none
 // is waiting, the read fails, or the character is a UTF-16 surrogate.
@@ -105,7 +106,22 @@ InputKeysPoll (
   }
   if (Any) {
     ResetKeys ();
-  } else {
+  }
+  // Select and Home on the gamepad MCU move like volume up and down. A
+  // held button counts as a fresh report at every poll, as a held volume
+  // key does after the reset.
+  {
+    UINT32 Mcu = McuKeysHeld ();
+
+    if (Mcu & (MCU_KEY_SELECT | MCU_KEY_HOME)) {
+      Any = TRUE;
+      if (KeysPress (&Keys->Decoder, (Mcu & MCU_KEY_SELECT) ? INPUT_UP : INPUT_DOWN, Now,
+                     &Decoded)) {
+        (VOID)VecPush (Out, Decoded);
+      }
+    }
+  }
+  if (!Any) {
     KeysIdle (&Keys->Decoder, Now);
   }
 }

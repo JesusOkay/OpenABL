@@ -20,6 +20,7 @@
 #include "Efi/DefaultFiles.h"
 #include "Efi/Display.h"
 #include "Efi/DpHw.h"
+#include "Efi/McuKeys.h"
 #include "Efi/DpProbe.h"
 #include "Efi/Input.h"
 #include "Efi/Models.h"
@@ -1150,6 +1151,7 @@ RunMenu (
   MenuLog ("openabl-menu: %u graphics output(s)", (UINT32)gDisplayGopCount);
   // USB-C DisplayPort bring-up, phase 1: read-only report to misc.
   DpProbeRun ();
+  McuKeysStart ();
   DisplaySize (&mDisplay, &PanelW, &PanelH);
   Panel = (PANEL){.W       = (UINT32)PanelW,
                   .H       = (UINT32)PanelH,
