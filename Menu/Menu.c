@@ -214,6 +214,11 @@ Act (
   EFI_STATUS Status;
 
   MenuLog ("action %s", MenuHostActionName (Action));
+  // The menu shows at every boot; Start's restart must boot, not loop back.
+  if (Action == OPENABL_MENU_ACTION_START) {
+    STATIC CONST UINT8 One = 1;
+    SettingsFlagSet (SETTINGS_FLAG_SKIP_MENU_ONCE, &One, 1);
+  }
   Status = MenuHostAction (&M->Host, Action);
   MenuLog ("%s -> %s", MenuHostActionName (Action), MENU_STATUS (Status));
   return Status;

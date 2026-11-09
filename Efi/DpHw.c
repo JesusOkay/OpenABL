@@ -197,6 +197,9 @@ Hex (
 
 STATIC BOOLEAN Video (VOID);
 
+// Plug flipped (attached on CC2): the DP lanes leave on the other PHY half.
+STATIC BOOLEAN mReverse;
+
 BOOLEAN
 DpHwRun (
   IN CONST DP_HW_IO *Io,
@@ -207,6 +210,7 @@ DpHwRun (
   UINT32 V;
 
   mIo = Io;
+  mReverse = Reverse;
   Snapshot ("before");
   if (R (DISPCC_BASE + DISPCC_MDSS_GDSCR) & BIT0) {
     // SW_COLLAPSE set: MDSS is off and its registers would hang the bus.
@@ -417,7 +421,7 @@ Swing (
   return TRUE;
 }
 
-// qmp_combo_dp_power_on at HBR2, 2 lanes, normal orientation.
+// qmp_combo_dp_power_on at HBR2, 2 lanes, either orientation.
 STATIC BOOLEAN
 PhyPowerOn (VOID)
 {
@@ -435,8 +439,9 @@ PhyPowerOn (VOID)
   Swing (0, 0);
   // qmp_v456_configure_dp_phy
   W (QMP_DP_PHY + 0x014, 0x0f);              // CFG_1
-  W (QMP_DP_PHY + DPPHY_PD_CTL, 0x75);       // on, AUX, PLL, clamp, lanes 2/3
-  W (QMP_DP_PHY + 0x01c, 0x5c);              // MODE, normal orientation
+  // qmp_combo_configure_dp_mode: power down the unused lane pair.
+  W (QMP_DP_PHY + DPPHY_PD_CTL, mReverse ? 0x6d : 0x75);
+  W (QMP_DP_PHY + 0x01c, mReverse ? 0x4c : 0x5c);  // MODE
   W (QMP_DP_PHY + 0x024, 0x13);
   W (QMP_DP_PHY + 0x028, 0xa4);
   W (QMP_DP_PHY + 0x078, 0x05);
@@ -457,11 +462,11 @@ PhyPowerOn (VOID)
       !Poll (QMP_DP_PHY + DPPHY_STATUS, BIT1, "phy status1")) {
     return FALSE;
   }
-  // qmp_v4_configure_dp_phy, 2 lanes, normal
+  // qmp_v4_configure_dp_phy, 2 lanes
   W (QMP_DP_TXA + TX_HIGHZ, 0x10);
-  W (QMP_DP_TXA + TX_BIAS_EN, 0x15);
+  W (QMP_DP_TXA + TX_BIAS_EN, mReverse ? 0x3f : 0x15);
   W (QMP_DP_TXB + TX_HIGHZ, 0x10);
-  W (QMP_DP_TXB + TX_BIAS_EN, 0x3f);
+  W (QMP_DP_TXB + TX_BIAS_EN, mReverse ? 0x15 : 0x3f);
   W (QMP_DP_PHY + DPPHY_CFG, 0x18);
   gBS->Stall (2000);
   W (QMP_DP_PHY + DPPHY_CFG, 0x19);
@@ -781,8 +786,14 @@ Video (VOID)
   W (DP_LINK + LINK_LANEMAP, 0xe4);
   W (DP_LINK + LINK_CONFIG, 0x4157);
   MARK ("hw: training\n");
-  if (!Train ()) {
-    return FALSE;
+  // Equalization sometimes never locks at the same settings that lock on
+  // another run (seen ~3 in 10 boots): train again from clock recovery.
+  for (UINT32 Run = 0; !Train (); Run++) {
+    if (Run == 3) {
+      return FALSE;
+    }
+    SAY ("train: retry %u\n", Run + 1);
+    gBS->Stall (20000);
   }
   MARK ("hw: video\n");
   W (DP_LINK + LINK_MISC, 0x21);

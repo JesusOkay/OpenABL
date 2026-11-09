@@ -130,6 +130,8 @@ typedef struct _SETTINGS {
 // What Boot entries picked for the next Start, kept across a restart: the
 // drive's device path length (Le16), the path, then the entry's id.
 #define SETTINGS_FLAG_BOOT_ENTRY_ONCE "BootEntryOnce"
+// Start was picked in the menu: the next boot goes on without the menu.
+#define SETTINGS_FLAG_SKIP_MENU_ONCE "SkipMenuOnce"
 
 // Rules
 

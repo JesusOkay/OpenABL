@@ -831,6 +831,7 @@ RunBoot (
 {
   BOOT_DECISION_START Start = MenuHostStateStart (State);
   BOOLEAN             Charger;
+  BOOLEAN             SkipMenu;
   BOOLEAN             Alt;
   BOOLEAN             Usb;
   BOOLEAN             UsbUp;
@@ -838,6 +839,11 @@ RunBoot (
 
   if (ModelListRequested (State)) {
     return ModelListAfterRestart (Host);
+  }
+  // Read and clear first, so a menu entered any other way consumes it too.
+  SkipMenu = SettingsFlagIs (SETTINGS_FLAG_SKIP_MENU_ONCE, 1);
+  if (SkipMenu) {
+    SettingsFlagSet (SETTINGS_FLAG_SKIP_MENU_ONCE, NULL, 0);
   }
   if (DpProbeWanted ()) {
     MenuLog ("dp probe run asked for");
@@ -858,6 +864,12 @@ RunBoot (
   if (Charger) {
     gMenuHostChargerBoot = TRUE;
     MenuLog ("powered on by the charger");
+  }
+  // Always offer the menu (the panel may be dead: it also lights DP), unless
+  // the menu's own Start asked for this boot or the charger powered us on.
+  if (!SkipMenu && !Charger) {
+    MenuLog ("menu at every boot");
+    return FastbootPath (Host, MENU_START_RESULT_NONE);
   }
   Alt = State->AltVolumeBoot;
   if ((State->StartAndroid || Charger) && !Alt) {
